@@ -32,6 +32,16 @@ async function run() {
     const listingsCollection = db.collection('listings');
     const categoriesCollection = db.collection('categories');
     const ordersCollection = db.collection('orders');
+    app.get('/listings', async (req, res) => {
+        const email = req.query.email;
+        const query = {};
+        if (email) {
+          query.email = email;
+        }
+        const cursor = listingsCollection.find(query).sort({ created_at: -1 });
+        const result = await cursor.toArray();
+        res.send(result);
+    });
 
     // Get latest data
     app.get('/listings', async (req, res) => {
@@ -83,9 +93,9 @@ async function run() {
     });
 
     app.post('/listings', async (req, res) => {
-        const newListing = { ...req.body, created_at: new Date() }; // add timestamp
-        const result = await listingsCollection.insertOne(newListing);
-        res.send(result);
+      const newListing = { ...req.body, created_at: new Date() }; // add timestamp
+      const result = await listingsCollection.insertOne(newListing);
+      res.send(result);
     });
 
     // post by orders data
