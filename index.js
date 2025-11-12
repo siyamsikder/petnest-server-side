@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -31,11 +31,12 @@ async function run() {
     const db = client.db('pawMartDB');
     const listingsCollection = db.collection('listings');
     const categoriesCollection = db.collection('categories');
+    const ordersCollection = db.collection("orders");
 
     // Get latest data
     app.get('/listings', async (req, res) => {
       try {
-        const cursor = listingsCollection.find().sort({ created_at: -1 }).limit(6);
+        const cursor = listingsCollection.find().sort({ created_at: -1 });
         const result = await cursor.toArray();
         res.send(result);
       } catch (error) {
@@ -43,6 +44,13 @@ async function run() {
         res.status(500).send({ message: 'Failed to fetch listings' });
       }
     });
+    app.get('/listings/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: id };
+      const result = await listingsCollection.findOne(query);
+      res.send(result);
+    });
+
 
     //Get all categories
     app.get('/categories', async (req, res) => {
@@ -53,6 +61,24 @@ async function run() {
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: 'Failed to fetch categories' });
+      }
+    });
+    // Get filtered listings by category
+    app.get('/category-filtered-product/:categoryName', async (req, res) => {
+      try {
+        const categoryName = decodeURIComponent(req.params.categoryName);
+        const query = { category: categoryName };
+        const cursor = listingsCollection.find(query);
+        const result = await cursor.toArray();
+
+        if (result.length === 0) {
+          return res.status(404).send({ message: `No listings found for ${categoryName}` });
+        }
+
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: 'Failed to fetch filtered listings' });
       }
     });
 
