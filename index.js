@@ -31,7 +31,7 @@ async function run() {
     const db = client.db('pawMartDB');
     const listingsCollection = db.collection('listings');
     const categoriesCollection = db.collection('categories');
-    const ordersCollection = db.collection("orders");
+    const ordersCollection = db.collection('orders');
 
     // Get latest data
     app.get('/listings', async (req, res) => {
@@ -81,6 +81,26 @@ async function run() {
         res.status(500).send({ message: 'Failed to fetch filtered listings' });
       }
     });
+
+    app.post('/listings', async (req, res) => {
+        const newListing = { ...req.body, created_at: new Date() }; // add timestamp
+        const result = await listingsCollection.insertOne(newListing);
+        res.send(result);
+    });
+
+    // post by orders data
+    app.get("/orders", async (req, res) => {
+      const cursor = ordersCollection.find().sort({ created_at: -1 });
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.post('/orders', async (req, res) => {
+      const newOrderse = req.body;
+      const result = await ordersCollection.insertOne(newOrderse);
+      res.send(result);
+    });
+
 
     // MongoDB Ping Test
     await client.db("admin").command({ ping: 1 });
