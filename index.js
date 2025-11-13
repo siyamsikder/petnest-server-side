@@ -32,16 +32,19 @@ async function run() {
     const listingsCollection = db.collection('listings');
     const categoriesCollection = db.collection('categories');
     const ordersCollection = db.collection('orders');
+
+
     app.get('/listings', async (req, res) => {
-        const email = req.query.email;
-        const query = {};
-        if (email) {
-          query.email = email;
-        }
-        const cursor = listingsCollection.find(query).sort({ created_at: -1 });
-        const result = await cursor.toArray();
-        res.send(result);
+      const email = req.query.email;
+      const query = {};
+      if (email) {
+        query.email = email;
+      }
+      const cursor = listingsCollection.find(query).sort({ created_at: -1 });
+      const result = await cursor.toArray();
+      res.send(result);
     });
+
 
     // Get latest data
     app.get('/listings', async (req, res) => {
@@ -54,6 +57,18 @@ async function run() {
         res.status(500).send({ message: 'Failed to fetch listings' });
       }
     });
+    // Delete listing by id
+    app.delete("/listings/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await listingsCollection.deleteOne(query);
+
+      if (result.deletedCount === 1) {
+        res.send({ success: true, message: "Listing deleted successfully" });
+      }
+
+    });
+
     app.get('/listings/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: id };
@@ -99,6 +114,17 @@ async function run() {
     });
 
     // post by orders data
+
+    app.get('/orders', async (req, res) => {
+      const email = req.query.email;
+      const query = {};
+      if (email) {
+        query.email = email;
+      }
+      const cursor = ordersCollection.find(query).sort({ created_at: -1 });
+      const result = await cursor.toArray();
+      res.send(result);
+    });
     app.get("/orders", async (req, res) => {
       const cursor = ordersCollection.find().sort({ created_at: -1 });
       const result = await cursor.toArray();
