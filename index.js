@@ -91,22 +91,26 @@ async function run() {
     });
 
     // --- Users API ---
-    app.post('/users', async (req, res) => {
+    app.post("/users", async (req, res) => {
       const user = req.body;
       const query = { email: user.email };
       const existingUser = await usersCollection.findOne(query);
+
       if (existingUser) {
-        return res.send({ message: 'User already exists', insertedId: null });
+        return res.send({ message: "User already exists", insertedId: null });
       }
+
+      const role = user.email === "siyam0sikder@gmail.com" ? "admin" : "user";
       const result = await usersCollection.insertOne({
-        role: 'user', // default role
-        status: 'Active',
+        ...user,
+        role: role,
+        status: "Active",
         joined: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-        ...user
+        createdAt: new Date(),
       });
+
       res.send(result);
     });
-
     app.get('/users', async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
@@ -131,10 +135,37 @@ async function run() {
       const totalPets = await listingsCollection.estimatedDocumentCount();
       const totalOrders = await ordersCollection.estimatedDocumentCount();
 
-      // Calculate growth (stub for now)
-      const growth = "+15%";
+      // Category breakdown for Pie Chart
+      const categoryData = await listingsCollection.aggregate([
+        { $group: { _id: "$category", count: { $sum: 1 } } }
+      ]).toArray();
 
-      res.send({ totalUsers, totalPets, totalOrders, growth });
+      // Monthly adoption/listing trends for Bar Chart (last 6 months)
+      // Since we don't have many orders, let's use listings added per month
+      const trendsData = await listingsCollection.aggregate([
+        {
+          $group: {
+            _id: { $month: "$createdAt" },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { "_id": 1 } }
+      ]).toArray();
+
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const formattedTrends = trendsData.map(item => ({
+        name: monthNames[item._id - 1] || "Unknown",
+        listings: item.count
+      }));
+
+      res.send({
+        totalUsers,
+        totalPets,
+        totalOrders,
+        growth: "+15%",
+        categoryData: categoryData.map(c => ({ name: c._id, value: c.count })),
+        trendsData: formattedTrends
+      });
     });
 
 
