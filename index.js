@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const jwt = require('jsonwebtoken');
 require("dotenv").config()
 const app = express();
 const port = process.env.PORT || 3000;
@@ -30,6 +31,40 @@ async function run() {
     const categoriesCollection = db.collection('categories');
     const ordersCollection = db.collection('orders');
     const usersCollection = db.collection('users');
+
+    // --- JWT API ---
+    app.post('/jwt', async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+      res.send({ token });
+    });
+
+    // --- Middlewares ---
+    const verifyToken = (req, res, next) => {
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: 'unauthorized access' });
+      }
+      const token = req.headers.authorization.split(' ')[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: 'unauthorized access' });
+        }
+        req.decoded = decoded;
+        next();
+      });
+    };
+
+    // use verify admin after verifyToken
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const isAdmin = user?.role === 'admin';
+      if (!isAdmin) {
+        return res.status(403).send({ message: 'forbidden access' });
+      }
+      next();
+    };
 
     // --- Listings API ---
     app.get('/listings', async (req, res) => {
@@ -77,8 +112,27 @@ async function run() {
     });
 
     // --- Orders API ---
-    app.get('/orders', async (req, res) => {
+    app.get('/orders', verifyToken, async (req, res) => {
       const email = req.query.email;
+      const decodedEmail = req.decoded.email;
+
+      // If email is provided, verify it matches decoded email (unless admin)
+      if (email && email !== decodedEmail) {
+        // Only admin can see other users' orders
+        const user = await usersCollection.findOne({ email: decodedEmail });
+        if (user?.role !== 'admin') {
+          return res.status(403).send({ message: 'forbidden access' });
+        }
+      }
+
+      // If no email provided, only admin can see all orders
+      if (!email) {
+        const user = await usersCollection.findOne({ email: decodedEmail });
+        if (user?.role !== 'admin') {
+          return res.status(403).send({ message: 'forbidden access' });
+        }
+      }
+
       const query = email ? { email } : {};
       const result = await ordersCollection.find(query).sort({ created_at: -1 }).toArray();
       res.send(result);
@@ -111,7 +165,7 @@ async function run() {
 
       res.send(result);
     });
-    app.get('/users', async (req, res) => {
+    app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
@@ -130,7 +184,7 @@ async function run() {
     });
 
     // --- Admin Stats ---
-    app.get('/admin-stats', async (req, res) => {
+    app.get('/admin-stats', verifyToken, verifyAdmin, async (req, res) => {
       const totalUsers = await usersCollection.estimatedDocumentCount();
       const totalPets = await listingsCollection.estimatedDocumentCount();
       const totalOrders = await ordersCollection.estimatedDocumentCount();
