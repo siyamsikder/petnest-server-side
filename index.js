@@ -176,6 +176,15 @@ async function run() {
       res.send(result);
     });
 
+    app.get('/users/role/:email', verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' });
+      }
+      const user = await usersCollection.findOne({ email });
+      res.send({ role: user?.role || 'user' });
+    });
+
     app.patch('/users/:email', async (req, res) => {
       const email = req.params.email;
       const updatedUser = req.body;
@@ -220,6 +229,18 @@ async function run() {
         categoryData: categoryData.map(c => ({ name: c._id, value: c.count })),
         trendsData: formattedTrends
       });
+    });
+
+    app.get('/user-stats/:email', verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' });
+      }
+
+      const totalListings = await listingsCollection.countDocuments({ email });
+      const totalOrders = await ordersCollection.countDocuments({ email });
+
+      res.send({ totalListings, totalOrders });
     });
 
 
